@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const dgram = require('dgram');
 
 // Replace '6725616382:AAFThqEKrBdWBNvomNBucwvoH2GmSC2Zx90' with the token you get from BotFather
-const token = 'YOUR_TELEGRAM_BOT_TOKEN';
+const token = '6725616382:AAFThqEKrBdWBNvomNBucwvoH2GmSC2Zx90';
 const bot = new TelegramBot(token, { polling: true });
 
 let floodInstances = {};
