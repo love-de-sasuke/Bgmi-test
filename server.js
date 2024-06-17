@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const process = require('process');
 
 // Replace with your Telegram bot token
-const token = '6310163818:AAFyvNq9RxwpHGezbdYTETIbvNNj-_suSgM';
+const token = '6928006374:AAH5gudHAogy1jzx4_8Z1quh-iQePupBOQc';
 
 // Create a bot that uses 'polling' to fetch new updates
 const bot = new TelegramBot(token, { polling: true });
